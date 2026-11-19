@@ -12,7 +12,7 @@ use {
 };
 
 pub fn create_initialise_ix(
-    mut _svm: &mut LiteSVM,
+    svm: &mut LiteSVM,
     payer: &Keypair,
     mint_x: Pubkey,
     mint_y: Pubkey,
@@ -21,14 +21,32 @@ pub fn create_initialise_ix(
     vault_x: Pubkey,
     vault_y: Pubkey,
 ) -> Instruction {
+    create_initialise_ix_with_params(
+        svm, payer, mint_x, mint_y, config, mint_lp, vault_x, vault_y, 30, 0, None,
+    )
+}
+
+pub fn create_initialise_ix_with_params(
+    _svm: &mut LiteSVM,
+    payer: &Keypair,
+    mint_x: Pubkey,
+    mint_y: Pubkey,
+    config: Pubkey,
+    mint_lp: Pubkey,
+    vault_x: Pubkey,
+    vault_y: Pubkey,
+    fee: u16,
+    protocol_fee_bps: u16,
+    authority: Option<Pubkey>,
+) -> Instruction {
     let maker = payer.pubkey();
     Instruction::new_with_bytes(
         amm_program::id(),
         &amm_program::instruction::Initialize {
             seed: 123,
-            fee: 30,
-            protocol_fee_bps: 0,
-            authority: None,
+            fee,
+            protocol_fee_bps,
+            authority,
         }
         .data(),
         amm_program::accounts::Initialize {

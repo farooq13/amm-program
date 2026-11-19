@@ -12,7 +12,7 @@ use {
 };
 
 pub fn create_deposit_ix(
-    mut svm: &mut LiteSVM,
+    svm: &mut LiteSVM,
     payer: &Keypair,
     mint_x: Pubkey,
     mint_y: Pubkey,
@@ -21,21 +21,55 @@ pub fn create_deposit_ix(
     vault_x: Pubkey,
     vault_y: Pubkey,
 ) -> Instruction {
+    create_deposit_ix_with_params(
+        svm,
+        payer,
+        mint_x,
+        mint_y,
+        mint_lp,
+        config,
+        vault_x,
+        vault_y,
+        100_000_000,
+        200_000_000,
+        200_000_000,
+    )
+}
+
+pub fn create_deposit_ix_with_params(
+    svm: &mut LiteSVM,
+    payer: &Keypair,
+    mint_x: Pubkey,
+    mint_y: Pubkey,
+    mint_lp: Pubkey,
+    config: Pubkey,
+    vault_x: Pubkey,
+    vault_y: Pubkey,
+    amount: u64,
+    max_x: u64,
+    max_y: u64,
+) -> Instruction {
     let user = payer.pubkey();
 
-    let user_x = CreateAssociatedTokenAccount::new(&mut svm, &payer, &mint_x)
-        .owner(&user)
-        .send()
-        .unwrap();
-    MintTo::new(&mut svm, &payer, &mint_x, &user_x, 1000000000)
+    let user_x = associated_token::get_associated_token_address(&user, &mint_x);
+    if svm.get_account(&user_x).is_none() {
+        CreateAssociatedTokenAccount::new(svm, payer, &mint_x)
+            .owner(&user)
+            .send()
+            .unwrap();
+    }
+    MintTo::new(svm, payer, &mint_x, &user_x, 1_000_000_000)
         .send()
         .unwrap();
 
-    let user_y = CreateAssociatedTokenAccount::new(&mut svm, &payer, &mint_y)
-        .owner(&user)
-        .send()
-        .unwrap();
-    MintTo::new(&mut svm, &payer, &mint_y, &user_y, 1000000000)
+    let user_y = associated_token::get_associated_token_address(&user, &mint_y);
+    if svm.get_account(&user_y).is_none() {
+        CreateAssociatedTokenAccount::new(svm, payer, &mint_y)
+            .owner(&user)
+            .send()
+            .unwrap();
+    }
+    MintTo::new(svm, payer, &mint_y, &user_y, 1_000_000_000)
         .send()
         .unwrap();
 
@@ -44,9 +78,9 @@ pub fn create_deposit_ix(
     Instruction::new_with_bytes(
         amm_program::id(),
         &amm_program::instruction::Deposit {
-            amount: 100_000_000,
-            max_x: 200_000_000,
-            max_y: 200_000_000,
+            amount,
+            max_x,
+            max_y,
         }
         .data(),
         amm_program::accounts::Deposit {

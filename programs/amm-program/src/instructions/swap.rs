@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 
-use crate::{constants::BPS_DENOMINATOR, error::AmmError, state::Config};
+use crate::{error::AmmError, math, state::Config};
 
 #[derive(Accounts)]
 pub struct Swap<'info> {
@@ -89,26 +89,15 @@ impl<'info> Swap<'info> {
             AmmError::NoLiquidityInPool
         );
 
-        let total_fee = calculate_fee_rounded_up(amount_in, self.config.fee)?;
-        let protocol_fee = calculate_fee_rounded_up(amount_in, self.config.protocol_fee_bps)?;
+        let total_fee = math::fee_amount_ceil(amount_in, self.config.fee)?;
+        let protocol_fee = math::fee_amount_ceil(amount_in, self.config.protocol_fee_bps)?;
         require!(protocol_fee <= total_fee, AmmError::InvalidFee);
         let effective_input = amount_in
             .checked_sub(total_fee)
             .ok_or(AmmError::Underflow)?;
         require!(effective_input > 0, AmmError::InvalidAmount);
 
-        let output_numerator = u128::from(reserve_out)
-            .checked_mul(u128::from(effective_input))
-            .ok_or(AmmError::Overflow)?;
-        let output_denominator = u128::from(reserve_in)
-            .checked_add(u128::from(effective_input))
-            .ok_or(AmmError::Overflow)?;
-        let amount_out = u64::try_from(
-            output_numerator
-                .checked_div(output_denominator)
-                .ok_or(AmmError::Overflow)?,
-        )
-        .map_err(|_| error!(AmmError::Overflow))?;
+        let amount_out = math::swap_output_amount(reserve_in, reserve_out, effective_input)?;
         require!(
             amount_out >= minimum_amount_out,
             AmmError::SlippageLimitExceeded
@@ -169,17 +158,4 @@ impl<'info> Swap<'info> {
             amount_out,
         )
     }
-}
-
-fn calculate_fee_rounded_up(amount: u64, fee_bps: u16) -> Result<u64> {
-    let numerator = u128::from(amount)
-        .checked_mul(u128::from(fee_bps))
-        .ok_or(AmmError::Overflow)?;
-    let rounded_fee = numerator
-        .checked_add(u128::from(BPS_DENOMINATOR - 1))
-        .ok_or(AmmError::Overflow)?
-        .checked_div(u128::from(BPS_DENOMINATOR))
-        .ok_or(AmmError::Overflow)?;
-
-    u64::try_from(rounded_fee).map_err(|_| error!(AmmError::Overflow))
 }

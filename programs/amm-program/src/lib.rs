@@ -1,6 +1,7 @@
 pub mod constants;
 pub mod error;
 pub mod instructions;
+mod math;
 pub mod state;
 
 use anchor_lang::prelude::*;
@@ -28,6 +29,10 @@ pub mod amm_program {
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64, max_x: u64, max_y: u64) -> Result<()> {
         ctx.accounts.deposit(amount, max_x, max_y)
+    }
+
+    pub fn withdraw(ctx: Context<Withdraw>, amount: u64, min_x: u64, min_y: u64) -> Result<()> {
+        ctx.accounts.withdraw(amount, min_x, min_y)
     }
 
     pub fn swap(

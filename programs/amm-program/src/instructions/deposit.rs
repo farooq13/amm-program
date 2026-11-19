@@ -1,11 +1,9 @@
+use crate::{error::AmmError, math, state::Config};
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{mint_to, transfer, Mint, MintTo, Token, TokenAccount, Transfer},
 };
-use constant_product_curve::ConstantProduct;
-
-use crate::{error::AmmError, state::Config};
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {
@@ -77,21 +75,16 @@ impl<'info> Deposit<'info> {
             if self.mint_lp.supply == 0 && self.vault_x.amount == 0 && self.vault_y.amount == 0 {
                 (max_x, max_y)
             } else {
-                let amounts = ConstantProduct::xy_deposit_amounts_from_l(
+                let (x, y) = math::liquidity_deposit_amounts(
                     self.vault_x.amount,
                     self.vault_y.amount,
                     self.mint_lp.supply,
                     amount,
-                    6,
-                )
-                .unwrap();
+                )?;
 
-                require!(
-                    amounts.x <= max_x && amounts.y <= max_y,
-                    AmmError::SlippageLimitExceeded
-                );
+                require!(x <= max_x && y <= max_y, AmmError::SlippageLimitExceeded);
 
-                (amounts.x, amounts.y)
+                (x, y)
             };
 
         // deposit token x
